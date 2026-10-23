@@ -1,38 +1,90 @@
-version: '3.8'
-
+name: room
+x-app-env: &app-env
+  NODE_ENV: development
+  DATABASE_URL: postgres://${POSTGRES_USER:?Set POSTGRES_USER}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:?Set POSTGRES_DB}
+  WEB_ORIGIN: ${WEB_ORIGIN:-http://localhost:5173}
+  S3_ENDPOINT: http://storage:9000
+  S3_REGION: ${S3_REGION:-us-east-1}
+  S3_BUCKET: ${S3_BUCKET:-room-audio}
+  S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:?Set S3_ACCESS_KEY_ID}
+  S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:?Set S3_SECRET_ACCESS_KEY}
+  JOB_LEASE_SECONDS: ${JOB_LEASE_SECONDS:-60}
+  RETENTION_DAYS: ${RETENTION_DAYS:-30}
+  LOG_LEVEL: ${LOG_LEVEL:-info}
+x-app: &app
+  image: room-api:local
+  build: {context: ., dockerfile: backend/Dockerfile}
+  environment: *app-env
+  init: true
+  restart: unless-stopped
+  stop_grace_period: 30s
 services:
   db:
     image: postgres:16
-    ports:
-      - '5432:5432'
     environment:
-      - POSTGRES_USER=room_user
-      - POSTGRES_PASSWORD=room_pass
-      - POSTGRES_DB=room_db
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB}
+    ports: ["127.0.0.1:${DB_PORT:-5432}:5432"]
+    volumes: ["postgres_data:/var/lib/postgresql/data"]
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U room_user -d room_db']
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 5s
-      timeout: 5s
-      retries: 5
-
-  api:
-    build: 
-      context: ./backend
-      target: production
-    ports:
-      - '3000:3000'
+      timeout: 3s
+      retries: 20
+  storage:
+    build: {context: ., dockerfile: infra/minio.Dockerfile}
+    image: room-minio:2025-04-22
+    command: server /data --console-address :9001
     environment:
-      - NODE_ENV=production
-      - DATABASE_URL=postgres://room_user:room_pass@db:5432/room_db
-      - JWT_SECRET=super_secret_development_key
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY_ID:?Set S3_ACCESS_KEY_ID}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_ACCESS_KEY:?Set S3_SECRET_ACCESS_KEY}
+    ports: ["127.0.0.1:${S3_PORT:-9000}:9000", "127.0.0.1:9001:9001"]
+    volumes: ["object_data:/data"]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  migrate:
+    <<: *app
+    restart: "no"
+    command: ["node", "backend/dist/scripts/migrate.js"]
     depends_on:
-      db:
-        condition: service_healthy
-
+      db: {condition: service_healthy}
+  storage-init:
+    <<: *app
+    restart: "no"
+    command: ["node", "backend/dist/scripts/storage-init.js"]
+    depends_on:
+      storage: {condition: service_healthy}
+  api:
+    <<: *app
+    ports: ["127.0.0.1:${API_PORT:-3000}:3000"]
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+      storage-init: {condition: service_completed_successfully}
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 4s
+      retries: 20
+  worker:
+    <<: *app
+    command: ["node", "backend/dist/worker.js"]
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+      storage-init: {condition: service_completed_successfully}
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3001/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 4s
+      retries: 20
   web:
-    build: 
-      context: ./frontend
-    ports:
-      - '80:80'
+    build: {context: ., dockerfile: frontend/Dockerfile}
+    ports: ["127.0.0.1:${WEB_PORT:-8080}:80"]
     depends_on:
-      - api
+      api: {condition: service_healthy}
+volumes:
+  postgres_data:
+  object_data:

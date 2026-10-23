@@ -1,0 +1,36 @@
+{
+  "name": "room",
+  "private": true,
+  "version": "1.0.0",
+  "workspaces": [
+    "packages/*",
+    "backend",
+    "frontend"
+  ],
+  "engines": {
+    "node": ">=24 <25",
+    "npm": ">=11 <12"
+  },
+  "scripts": {
+    "build": "npm run build -w @room/contracts && npm run build -w @room/api && npm run build -w @room/web",
+    "typecheck": "npm run build -w @room/contracts && npm run typecheck -w @room/api && npm run typecheck -w @room/web",
+    "lint": "oxlint backend/src backend/tests packages/contracts/src scripts tests/e2e playwright.config.ts && npm run lint -w @room/web",
+    "test": "npm run build -w @room/contracts && npm test -w @room/api",
+    "test:integration": "npm run build -w @room/contracts && npm run test:integration -w @room/api",
+    "dev:api": "node --env-file-if-exists=.env --watch --import tsx backend/src/server.ts",
+    "dev:web": "npm run dev -w @room/web",
+    "dev:worker": "node --env-file-if-exists=.env --watch --import tsx backend/src/worker.ts",
+    "db:migrate": "node --env-file-if-exists=.env backend/dist/scripts/migrate.js",
+    "db:seed": "node --env-file-if-exists=.env backend/dist/scripts/seed.js",
+    "test:e2e": "playwright test",
+    "storage:init": "node --env-file-if-exists=.env backend/dist/scripts/storage-init.js",
+    "test:integration:local": "node --env-file=.env scripts/test-local.mjs",
+    "fixtures": "node scripts/fixture-audio.mjs",
+    "test:turn": "node scripts/test-turn.mjs",
+    "test:recovery": "node --env-file=.env scripts/recovery-drill.mjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.56.0",
+    "oxlint": "^1.88.0"
+  }
+}

@@ -1,5 +1,5 @@
 {
-  "name": "frontend",
+  "name": "@room/web",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -7,14 +7,16 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "typecheck": "tsc -b"
   },
   "dependencies": {
     "lucide-react": "^1.61.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "react-router-dom": "^7.18.4",
-    "zustand": "^5.0.16"
+    "zustand": "^5.0.16",
+    "@room/contracts": "1.0.0"
   },
   "devDependencies": {
     "@types/node": "^24.19.2",
