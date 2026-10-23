@@ -1,0 +1,20 @@
+# Layer onto root Compose only on a host with DNS and inbound TCP 80/443.
+services:
+  api:
+    environment:
+      NODE_ENV: production
+      WEB_ORIGIN: https://${ROOM_HOST:?Set public DNS hostname}
+  worker:
+    environment:
+      NODE_ENV: production
+      WEB_ORIGIN: https://${ROOM_HOST:?Set public DNS hostname}
+  edge:
+    image: caddy:2.10-alpine
+    environment:
+      ROOM_HOST: ${ROOM_HOST:?Set public DNS hostname}
+    ports: ["80:80", "443:443"]
+    volumes: ["./infra/Caddyfile:/etc/caddy/Caddyfile:ro", "caddy_data:/data", "caddy_config:/config"]
+    depends_on: [web]
+volumes:
+  caddy_data:
+  caddy_config:

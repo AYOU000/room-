@@ -1,0 +1,19 @@
+# Substitute values in an ignored file; never commit the actual shared secret.
+listening-port=3478
+tls-listening-port=5349
+min-port=49160
+max-port=49200
+fingerprint
+use-auth-secret
+static-auth-secret=REPLACE_WITH_RANDOM_SECRET
+realm=turn.example.invalid
+external-ip=REPLACE_WITH_PUBLIC_IP
+cert=/etc/coturn/tls/fullchain.pem
+pkey=/etc/coturn/tls/privkey.pem
+no-cli
+no-loopback-peers
+no-multicast-peers
+no-tcp-relay
+stale-nonce=600
+user-quota=12
+total-quota=120

@@ -1,0 +1,39 @@
+name: Member 5 infrastructure
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run lint && npm run typecheck && npm test && npm run build
+      - run: node scripts/init-env.mjs
+      - run: docker compose build
+      - run: docker compose up -d --wait --wait-timeout 180
+      - run: npm run db:seed && npm run test:integration:local
+      - run: bash scripts/verify-db-restore.sh && npm run test:recovery
+      - run: npx playwright install --with-deps chromium
+      - run: npm run fixtures && npm run test:e2e
+      - run: npm run test:turn
+      - name: Retain browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: audio-browser-results
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+      - name: Cleanup disposable CI stack
+        if: always()
+        run: docker compose down -v

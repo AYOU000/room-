@@ -1,0 +1,10 @@
+# Optional TURN deployment. Generate infra/generated/turnserver.conf first; see operations.md.
+# Host networking is required for the configured relay range; Linux deployment only.
+services:
+  turn:
+    image: coturn/coturn:4.6.3
+    network_mode: host
+    command: ["-c", "/etc/coturn/turnserver.conf"]
+    volumes: ["./infra/generated/turnserver.conf:/etc/coturn/turnserver.conf:ro", "./infra/generated/tls:/etc/coturn/tls:ro"]
+    restart: unless-stopped
+    stop_grace_period: 60s
