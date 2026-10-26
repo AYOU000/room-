@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@vitejs/plugin-react": "latest",
+    "livekit-client": "^2.23.0",
     "react": "latest",
     "react-dom": "latest"
   },
