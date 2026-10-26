@@ -1,122 +1,102 @@
-import { useState } from 'react'
-import heroImg from './assets/hero.png'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import './App.css'
+import { useState } from "react";
 
-function App() {
-  const [count, setCount] = useState(0)
+type ApiStatus = "idle" | "checking" | "online" | "offline";
+
+export default function App() {
+  const [apiStatus, setApiStatus] = useState<ApiStatus>("idle");
+
+  async function checkBackend() {
+    setApiStatus("checking");
+
+    try {
+      const response = await fetch("/api/health");
+
+      if (!response.ok) {
+        throw new Error("API request failed");
+      }
+
+      const data = await response.json();
+
+      setApiStatus(data.status === "ok" ? "online" : "offline");
+    } catch {
+      setApiStatus("offline");
+    }
+  }
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
+    <main className="page">
+      <nav className="navbar">
+        <a className="brand" href="/">room<span>.</span></a>
+        <span className="nav-label">REAL-TIME DEBATE</span>
+      </nav>
 
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
+      <section className="hero">
+        <div className="eyebrow">
+          <span className="live-dot" />
+          A SPACE FOR IDEAS
         </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
+
+        <h1>
+          Think clearly.
+          <br />
+          <span>Debate openly.</span>
+        </h1>
+
+        <p className="description">
+          Two perspectives. One conversation.
+          <br />
+          A better way to challenge ideas and learn together.
+        </p>
+
+        <div className="actions">
+          <button className="primary-button" onClick={checkBackend}>
+            {apiStatus === "checking" ? "Checking..." : "Check connection"}
+            <span aria-hidden="true"> ↗</span>
+          </button>
+        </div>
+
+        <div className="status">
+          <span
+            className={`status-dot ${
+              apiStatus === "online"
+                ? "online"
+                : apiStatus === "offline"
+                  ? "offline"
+                  : ""
+            }`}
+          />
+          {apiStatus === "online"
+            ? "Backend connected successfully"
+            : apiStatus === "offline"
+              ? "Backend unavailable — check Docker logs"
+              : "Ready when you are"}
         </div>
       </section>
 
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+      <section className="features">
+        <article className="feature-card">
+          <span className="feature-number">01</span>
+          <h2>One topic</h2>
+          <p>Focus the conversation around a clear question or claim.</p>
+        </article>
+
+        <article className="feature-card">
+          <span className="feature-number">02</span>
+          <h2>Two voices</h2>
+          <p>Meet another perspective in a real-time audio debate.</p>
+        </article>
+
+        <article className="feature-card">
+          <span className="feature-number">03</span>
+          <h2>Better thinking</h2>
+          <p>Challenge arguments, explain your reasoning, and learn.</p>
+        </article>
+      </section>
+
+      <footer>
+        <span>ROOM © 2026</span>
+        <span>BUILT FOR BETTER CONVERSATIONS</span>
+      </footer>
+    </main>
+  );
 }
-
-export default App

@@ -1,38 +1,51 @@
-version: '3.8'
-
+﻿
 services:
-  db:
-    image: postgres:16
-    ports:
-      - '5432:5432'
+  postgres:
+    image: postgres:16-alpine
+    container_name: room_postgres
+    restart: unless-stopped
     environment:
-      - POSTGRES_USER=room_user
-      - POSTGRES_PASSWORD=room_pass
-      - POSTGRES_DB=room_db
+      POSTGRES_USER: ${POSTGRES_USER:-room_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-room_db}
+    volumes:
+      - room_postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U room_user -d room_db']
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
 
-  api:
-    build: 
+  backend:
+    build:
       context: ./backend
-      target: production
-    ports:
-      - '3000:3000'
+      dockerfile: Dockerfile
+    container_name: room_api
+    restart: unless-stopped
     environment:
-      - NODE_ENV=production
-      - DATABASE_URL=postgres://room_user:room_pass@db:5432/room_db
-      - JWT_SECRET=super_secret_development_key
-    depends_on:
-      db:
-        condition: service_healthy
-
-  web:
-    build: 
-      context: ./frontend
+      PORT: 4000
+      DATABASE_URL: postgresql://${POSTGRES_USER:-room_user}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-room_db}?schema=public
     ports:
-      - '80:80'
+      - "4000:4000"
     depends_on:
-      - api
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: room_frontend
+    restart: unless-stopped
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend    
+
+volumes:
+  room_postgres_data:
