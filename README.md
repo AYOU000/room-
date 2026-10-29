@@ -5,7 +5,7 @@ Room is a web-based debate platform where two participants can join a debate roo
 ## Tech Stack
 
 - **Frontend:** React, TypeScript, Vite, Tailwind CSS
-- **Backend:** Node.js, Express, TypeScript
+- **Backend:** Node.js, Express & TypeScript
 - **Database:** PostgreSQL 16
 - **Real-time audio:** LiveKit and WebRTC
 - **Containers:** Docker and Docker Compose
