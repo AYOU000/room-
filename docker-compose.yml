@@ -20,6 +20,10 @@
     container_name: room_livekit
     restart: unless-stopped
     command: --config /etc/livekit.yaml --bind 0.0.0.0
+    env_file:
+      - .env
+    environment:
+      LIVEKIT_KEYS: "${LIVEKIT_API_KEY}: ${LIVEKIT_API_SECRET}"
     ports:
       - "${LIVEKIT_HTTP_PORT:-7880}:7880"
       - "${LIVEKIT_TCP_PORT:-7881}:7881"
