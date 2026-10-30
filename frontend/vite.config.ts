@@ -9,9 +9,12 @@ export default defineConfig({
     strictPort: true,
     proxy: {
       "/api": {
-        target: "http://backend:4000",
+        target: process.env.API_PROXY_TARGET || "http://localhost:4000",
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api/, ""),
+      },
+      "/health": {
+        target: process.env.API_PROXY_TARGET || "http://localhost:4000",
+        changeOrigin: true,
       },
     },
   },

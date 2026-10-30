@@ -2,14 +2,15 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Room, RoomEvent, Track } from "livekit-client";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:4000";
+const API_URL = import.meta.env.VITE_API_URL || "";
 
 type TokenResponse = {
   serverUrl: string;
   roomName: string;
   identity: string;
   token: string;
-  error?: string;
+  error?: { code: string; message: string };
+  requestId?: string;
 };
 
 export default function App() {
@@ -63,7 +64,7 @@ export default function App() {
       const data = (await response.json()) as TokenResponse;
 
       if (!response.ok) {
-        throw new Error(data.error || "Could not get a room access token.");
+        throw new Error(data.error?.message || "Could not get a room access token.");
       }
 
       room = new Room();

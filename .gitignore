@@ -10,3 +10,8 @@ coverage/
 Thumbs.db
 
 backend/src/generated/
+.local/
+backups/
+artifacts/
+*.tsbuildinfo
+__pycache__/

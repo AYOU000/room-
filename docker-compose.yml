@@ -1,73 +1,172 @@
-﻿services:
+name: room
+x-api-build: &api-build
+  context: ./backend
+  dockerfile: Dockerfile
+x-api-env: &api-env
+  NODE_ENV: ${NODE_ENV:-development}
+  PORT: 4000
+  DATABASE_URL: postgresql://${POSTGRES_APP_USER:-room_app}:${POSTGRES_APP_PASSWORD:?Run python3 scripts/configure-local.py}@postgres:5432/${POSTGRES_DB:-room_db}?schema=public
+  LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:?Run python3 scripts/configure-local.py}
+  LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:?Run python3 scripts/configure-local.py}
+  LIVEKIT_PUBLIC_URL: ${LIVEKIT_PUBLIC_URL:-ws://localhost:7880}
+  ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:8080}
+  ENABLE_DEV_MEDIA_TOKENS: ${ENABLE_DEV_MEDIA_TOKENS:-false}
+  TRUSTED_PROXY_IPS: 172.30.50.10
+  RATE_LIMIT_IP_MAX: ${RATE_LIMIT_IP_MAX:-60}
+x-logs: &logs
+  driver: json-file
+  options:
+    max-size: '5m'
+    max-file: '3'
+services:
   postgres:
-    image: postgres:16-alpine
-    container_name: room_postgres
-    restart: unless-stopped
+    image: postgres:16-alpine@sha256:0cefaabd882e42bcb2a2f3dc56d3ce4770560ba62fd7f197f1a2e008fd5731ab
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-room_user}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      POSTGRES_USER: ${POSTGRES_USER:-room_admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run python3 scripts/configure-local.py}
       POSTGRES_DB: ${POSTGRES_DB:-room_db}
+      POSTGRES_APP_USER: ${POSTGRES_APP_USER:-room_app}
+      POSTGRES_APP_PASSWORD: ${POSTGRES_APP_PASSWORD:?Run python3 scripts/configure-local.py}
     volumes:
       - room_postgres_data:/var/lib/postgresql/data
+      - ./infra/postgres/init-app-role.sh:/docker-entrypoint-initdb.d/10-app-role.sh:ro
+    networks: [data]
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      test: ['CMD-SHELL', 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
       interval: 5s
-      timeout: 5s
-      retries: 10
+      timeout: 3s
+      retries: 20
+    security_opt: ['no-new-privileges:true']
+    logging: *logs
+    restart: unless-stopped
+
+  migrate:
+    build: *api-build
+    environment:
+      <<: *api-env
+      DATABASE_URL: postgresql://${POSTGRES_USER:-room_admin}:${POSTGRES_PASSWORD:?Run python3 scripts/configure-local.py}@postgres:5432/${POSTGRES_DB:-room_db}?schema=public
+    command: ['sh', '-c', 'npx --no-install prisma migrate deploy']
+    depends_on:
+      postgres: {condition: service_healthy}
+    networks: [data, outbound]
+    security_opt: ['no-new-privileges:true']
+    cap_drop: [ALL]
+    logging: *logs
+    restart: 'no'
 
   livekit:
-    image: livekit/livekit-server:${LIVEKIT_IMAGE_TAG:-latest}
-    container_name: room_livekit
-    restart: unless-stopped
-    command: --config /etc/livekit.yaml --bind 0.0.0.0
-    ports:
-      - "${LIVEKIT_HTTP_PORT:-7880}:7880"
-      - "${LIVEKIT_TCP_PORT:-7881}:7881"
-      - "${LIVEKIT_UDP_PORT:-7882}:7882/udp"
+    image: livekit/livekit-server@sha256:25cd902de7cacbd5f1f779f6a6ac1eae20ba8f56b0935934ce6b0ab80d1e3d20
+    user: '${LOCAL_UID:-1000}:${LOCAL_GID:-1000}'
+    command: ['--config', '/run/livekit.yaml', '--bind', '0.0.0.0']
     volumes:
-      - ./infra/livekit/livekit.yaml:/etc/livekit.yaml:ro
+      - ./.local/livekit.yaml:/run/livekit.yaml:ro
+    ports:
+      - '${MEDIA_BIND_IP:-127.0.0.1}:7880:7880'
+      - '${MEDIA_BIND_IP:-127.0.0.1}:7881:7881'
+      - '${MEDIA_BIND_IP:-127.0.0.1}:7882:7882/udp'
+    networks: [media]
+    healthcheck:
+      test: ['CMD', 'wget', '-Y', 'off', '-q', '-O', '/dev/null', 'http://127.0.0.1:7880/']
+      interval: 10s
+      timeout: 3s
+      retries: 12
+    security_opt: ['no-new-privileges:true']
+    cap_drop: [ALL]
+    read_only: true
+    tmpfs: ['/tmp:rw,noexec,nosuid,size=16m']
+    logging: *logs
+    restart: unless-stopped
 
   backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    container_name: room_api
-    restart: unless-stopped
-    environment:
-      NODE_ENV: ${NODE_ENV:-development}
-      PORT: ${BACKEND_PORT:-4000}
-      DATABASE_URL: postgresql://${POSTGRES_USER:-room_user}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-room_db}?schema=public
-      LIVEKIT_URL: ${LIVEKIT_INTERNAL_URL:-ws://livekit:7880}
-      LIVEKIT_PUBLIC_URL: ${LIVEKIT_PUBLIC_URL:-ws://localhost:7880}
-      LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:-devkey}
-      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:?Set LIVEKIT_API_SECRET in .env}
-    ports:
-      - "${BACKEND_PORT:-4000}:4000"
+    build: *api-build
+    environment: *api-env
     depends_on:
-      postgres:
-        condition: service_healthy
-      livekit:
-        condition: service_started
-    volumes:
-      - ./backend:/app
-      - /app/node_modules
+      migrate: {condition: service_completed_successfully}
+      livekit: {condition: service_healthy}
+    networks: [data, edge, media, outbound]
+    healthcheck:
+      test: ['CMD', 'node', '-e', "fetch('http://127.0.0.1:4000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    security_opt: ['no-new-privileges:true']
+    cap_drop: [ALL]
+    read_only: true
+    tmpfs: ['/tmp:rw,noexec,nosuid,size=16m']
+    logging: *logs
+    restart: unless-stopped
 
   frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    container_name: room_frontend
-    restart: unless-stopped
-    environment:
-      VITE_API_URL: ${VITE_API_URL:-http://localhost:4000}
-      VITE_LIVEKIT_URL: ${LIVEKIT_PUBLIC_URL:-ws://localhost:7880}
-    ports:
-      - "${FRONTEND_PORT:-5173}:5173"
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
+    build: ./frontend
     depends_on:
-      - backend
+      backend: {condition: service_healthy}
+    ports: ['${WEB_BIND_IP:-127.0.0.1}:${WEB_PORT:-8080}:8080']
+    networks:
+      edge: {ipv4_address: 172.30.50.10}
+    healthcheck:
+      test: ['CMD', 'wget', '-Y', 'off', '-q', '-O', '/dev/null', 'http://127.0.0.1:8080/healthz']
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    security_opt: ['no-new-privileges:true']
+    cap_drop: [ALL]
+    read_only: true
+    tmpfs: ['/tmp:rw,noexec,nosuid,size=32m']
+    logging: *logs
+    restart: unless-stopped
 
+  tls:
+    profiles: [production]
+    image: caddy:2.10-alpine@sha256:4c6e91c6ed0e2fa03efd5b44747b625fec79bc9cd06ac5235a779726618e530d
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN:-room.example.invalid}
+      MEDIA_DOMAIN: ${MEDIA_DOMAIN:-media.example.invalid}
+    ports: ['80:80', '443:443']
+    volumes:
+      - ./infra/proxy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks: [edge, media, outbound]
+    depends_on:
+      frontend: {condition: service_healthy}
+    security_opt: ['no-new-privileges:true']
+    logging: *logs
+    restart: unless-stopped
+
+  # Member 4 still owns the authenticated LiveKit-to-ASR adapter. This service
+  # alone does not produce attributed transcripts or evaluation input.
+  transcription:
+    profiles: [transcription]
+    build: ./infra/asr
+    command: ['wlk', '--host', '0.0.0.0', '--port', '8000', '--model', '/models/model', '--backend', 'faster-whisper']
+    volumes:
+      - ${ASR_MODEL_DIR:-./.local/models}:/models:ro
+    environment:
+      HF_HUB_OFFLINE: '1'
+      HF_HUB_DISABLE_TELEMETRY: '1'
+    networks: [asr]
+    healthcheck:
+      test: ['CMD', 'python', '-c', "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/', timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      start_period: 120s
+      retries: 20
+    security_opt: ['no-new-privileges:true']
+    cap_drop: [ALL]
+    read_only: true
+    tmpfs: ['/tmp:rw,noexec,nosuid,size=512m']
+    logging: {driver: none}
+    restart: unless-stopped
+
+networks:
+  data: {internal: true}
+  edge:
+    ipam:
+      config: [{subnet: 172.30.50.0/24}]
+  media: {}
+  outbound: {}
+  asr: {internal: true}
 volumes:
   room_postgres_data:
+  caddy_data:
+  caddy_config:

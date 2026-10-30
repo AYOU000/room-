@@ -1,0 +1,51 @@
+name: Member 5 security and deployment checks
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
+      - name: Frozen dependency installs
+        run: |
+          npm ci --prefix backend
+          npm ci --prefix frontend
+      - name: Types, feature/security tests, builds and dependency scans
+        run: |
+          npm run typecheck --prefix backend
+          npm run typecheck --prefix frontend
+          npm test --prefix backend
+          npm run build --prefix backend
+          npm run build --prefix frontend
+          npm audit --prefix backend --audit-level=high
+          npm audit --prefix frontend --audit-level=high
+      - name: Secret scans (redacted, current source)
+        run: |
+          python3 scripts/secret-scan.py
+          bash scripts/run-gitleaks.sh
+      - name: Clean Compose deployment
+        run: |
+          python3 scripts/configure-local.py
+          docker compose up -d --build --wait --wait-timeout 180
+          python3 scripts/compose-smoke.py
+          python3 scripts/privacy-log-smoke.py
+          node scripts/media-service-smoke.cjs
+      - name: Synthetic backup restore and least-privilege check
+        run: bash scripts/test-backup-restore.sh
+      - name: Cleanup without disclosing runtime configuration
+        if: always()
+        run: docker compose down --remove-orphans

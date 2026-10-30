@@ -1,10 +1,9 @@
+# Reference only. scripts/configure-local.py creates .local/livekit.yaml with
+# generated credentials matching .env. Never place real keys in this file.
 port: 7880
-log_level: info
-
+log_level: warn
 rtc:
   tcp_port: 7881
   udp_port: 7882
   use_external_ip: false
-
-keys:
-  devkey: b5e63d333e2ee993a6a5122cc04e86a7f41
+# keys: supplied in the ignored runtime file, not in Git.
