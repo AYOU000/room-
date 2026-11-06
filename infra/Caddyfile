@@ -1,0 +1,12 @@
+{
+    # No access logging: URL/cookie/body content must not enter operational logs.
+    admin off
+}
+{$APP_DOMAIN} {
+    header Strict-Transport-Security "max-age=31536000"
+    header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self' wss://{$MEDIA_DOMAIN}; img-src 'self' data:; media-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+    reverse_proxy frontend:8080
+}
+{$MEDIA_DOMAIN} {
+    reverse_proxy livekit:7880
+}

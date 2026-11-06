@@ -1,0 +1,87 @@
+{
+  "assessment_date": "2026-11-06",
+  "source_baseline": "2d25d68f1a94efd12cc9c0abb2c87f939ac9aa10",
+  "replacement_for": "member-5/security-devops at 35643469762b75c6c54f4ef71d6556c69e98d3b6",
+  "branch": "member-5/security-devops-main-layout",
+  "sources": [
+    "SRS v1.0,25 October 2026, especially SEC-01–08/OPS-01–03/NFR-07/AT-09–10",
+    "TEAM v1.0,25 October 2026,page6 Member5"
+  ],
+  "scope": "Member5 shared security/operations implementation with synthetic local checks; not all-SRS release certification",
+  "layout": {
+    "all_main_paths_retained": 2216,
+    "new_directories": 0,
+    "removed_main_files": 0,
+    "baseline_tracked_dependencies_changed": false,
+    "hosted_workflow_directory_added": false,
+    "ci_entrypoint": "backend/scripts/ci.sh"
+  },
+  "tests": {
+    "total": 54,
+    "passed": 54,
+    "failed": 0,
+    "pending": 0,
+    "files": 2
+  },
+  "npm_audit": {
+    "backend": {
+      "total": 0,
+      "high": 0,
+      "critical": 0
+    },
+    "frontend": {
+      "total": 0,
+      "high": 0,
+      "critical": 0
+    }
+  },
+  "checks": {
+    "backend_typecheck": "passed, source and tests",
+    "frontend_typecheck": "passed",
+    "backend_build": "passed",
+    "frontend_build": "passed, bundle-size warning",
+    "source_secret_scan": "passed, values redacted; unchanged legacy vendor tree excluded",
+    "gitleaks": "8.24.3 archive checksum verified; current authored source scan passed",
+    "docker_api_build": "passed, managed CA supplied via ephemeral BuildKit secret",
+    "docker_frontend_build": "passed, managed CA supplied via ephemeral BuildKit secret",
+    "compose_configuration": "all profiles validated; optional transcription not started",
+    "clean_core_compose": "passed, fresh synthetic DB volume; separate project/ports/subnet; prebuilt source-equivalent image selection and CA-only temporary override",
+    "prisma_migrate_deploy": "passed, one initial migration applied natively; no manual SQL substitution",
+    "core_health": "PostgreSQL,LiveKit,API,frontend healthy",
+    "proxy_security_smoke": "passed: frontend CSP,API health,fail-closed media,input attack,hostile Origin",
+    "media_service_smoke": "passed: authenticated synthetic LiveKit create/list/delete; no browser media claim",
+    "privacy_log_smoke": "passed: synthetic body/query/auth/cookie marker absent from core logs",
+    "backup_restore": "passed: native pg_dump/pg_restore into separate DB, one synthetic row restored,fixture removed",
+    "database_role": "passed: default application identity non-superuser,no create-role,no create-db and table-read test",
+    "caddy_config": "valid on isolated no-network container; real DNS/ACME/HTTPS not tested",
+    "shell_python_syntax": "passed",
+    "git_whitespace": "passed",
+    "migration_least_privilege_retest": "passed: database-only migration environment, native migration process exited 0"
+  },
+  "environment": {
+    "platform": "Linux amd64 managed cloud",
+    "host_node": "24.19.0",
+    "npm": "11.9.0",
+    "image_node": "22.23.4",
+    "docker": "28.4.0",
+    "compose": "2.40.3",
+    "postgres_major": "16",
+    "livekit": "1.13.11"
+  },
+  "not_demonstrated": [
+    "hosted CI run (runner-neutral script requested instead of new folders)",
+    "real account auth,Argon2id,refresh-family rotation/replay and private history",
+    "transactional two-human admission,room states,timers,active media revocation,authenticated event channel",
+    "real browser/cross-network microphone audio,TURN,latency,load,accessibility",
+    "project-owned ASR adapter,full inference/model lock,optional transcription profile",
+    "real transcript/cache/memory purge,AI/citation/retrieval/provider outage and retention behavior",
+    "public DNS/certificate/HTTPS/WSS deployment",
+    "operator rotation/revocation of reused historical credentials"
+  ],
+  "operation_notes": [
+    "Existing core services and existing database volumes were preserved.",
+    "Initial verification startup hit full Docker disk; unused build cache was removed, then the isolated core startup passed.",
+    "Generated credentials and runtime files are ignored; no private speech or real account data was used.",
+    "Verification containers were stopped/removed after testing; their synthetic database volume was preserved."
+  ]
+}

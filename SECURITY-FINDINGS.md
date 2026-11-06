@@ -1,0 +1,17 @@
+# Findings and release register
+
+Member 5 • 6 November 2026 • main baseline `2d25d68`. Priorities below are SRS implementation/release triage, not independent exploit severity or CVSS claims. All tests use synthetic inputs; no credential values are retained.
+
+| ID | Priority | Source/requirement and owner | Change or disposition | Retest / remaining gate |
+| --- | --- | --- | --- | --- |
+| M5-01 | Release blocking | SRS FR-04/09 requires authenticated membership; prototype accepted arbitrary room/identity — 1/2/5 | Token issuance denies by default; verified authorizer output supplies identity/room; development demo forbidden in production | Default denial and stub-authorizer identity/denial tests; real auth, two-human admission and consent still absent |
+| M5-02 | Release blocking | FR-09/13 microphone-only and actual shutdown — 2/5 | Five-minute microphone-only room grants; data/admin/record/metadata update disabled | Signed-claim/wrong-key/expiry checks; active connection termination still Member 2 work |
+| M5-03 | Release blocking if reused | SEC-08 public example credentials and prior history — operator/5 | Replace current template values with placeholders; generate unique ignored local secrets; reject production placeholders | Current-source scans pass; operator must rotate/revoke any reused historical values; history is not rewritten |
+| M5-04 | High maintenance | SEC-08 dependency advisory and build provenance — 5 | Preserve original dependency files as requested; ignore them in contexts/CI; frozen official-registry locks and exact versions; retain reviewed deepmerge-ts 8.0.2 override | Fresh audits and Prisma-config/merge regression tests pass; clean native migration tested separately |
+| M5-05 | Common control | INT-01/SEC-01/02 input and diagnostics — 5 | Strict schemas, content/size gates, stable safe errors/request IDs and metadata-only logging | API input, parser, error and log-marker tests; future endpoints must integrate helpers |
+| M5-06 | Common control | SEC-05/06 framing, origins and abuse — 5 | Frame restrictions in static and development servers; CSRF helper; exact origins; bounded limiter, trusted proxy and HTTP timeouts | Unit/proxy tests; cookie/WS integration and account-specific counters await owners |
+| M5-07 | Release blocking | FR-01–27 feature security and NFR-07 privacy — 1–4, review 5 | Explicit control/acceptance matrix and module handoffs; no fabricated end-to-end evidence | Accounts/replay/history, room state, transcript/cache/purge, AI/retrieval and outage journeys remain blocked or partial |
+| M5-08 | Constraint retained | Main contains tracked Windows node_modules — repository owner/5 | Keep every original path/file and its folder layout; use clean disposable installs instead | check-layout.py forbids dependency edits/additions, missing main files and new folders; future cleanup needs a separately authorized layout change |
+| M5-09 | Release blocking | OPS-01/SEC-07 inference/model/provider approval — 4/5/operator | Private optional WhisperLiveKit scaffold and explicit adapter/model/retention requirements | No ASR model/profile build, real speech processing or provider compliance is claimed |
+
+The native Prisma migration now passes in the isolated clean-volume core deployment. The old branch's previous environment failure is historical evidence, not a current blocker. Full product acceptance still requires the feature owners' work and AT-01–10 evidence.

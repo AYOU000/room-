@@ -1,160 +1,41 @@
-# Room — Real-Time Debate Platform
+# Room
 
-Room is a web-based debate platform where two participants can join a debate room and communicate in real time.
+Room uses React/TypeScript/Vite, Express, PostgreSQL and LiveKit. This branch delivers Member 5's shared security and deployment baseline for **SRS v1.0** and **TEAM v1.0** (25 October 2026). Accounts, room/session state, transcription and AI features remain assigned to Members 1–4; see [security controls](SECURITY-CONTROLS.md) and [acceptance evidence](SECURITY-TEST-REPORT.md).
 
-## Tech Stack
+All folders and existing tracked paths from `main` are retained. Security helpers are flat files in `backend/src`, scripts/tests are in `backend/scripts`, deployment additions are files in `infra`, and documentation is at repository root. Main's tracked Windows `backend/node_modules` is preserved unchanged and excluded from Docker contexts and disposable CI installs. No `.github`, `docs`, root `scripts`, `backend/tests` or `backend/src/security` directories are added.
 
-- **Frontend:** React, TypeScript, Vite, Tailwind CSS
-- **Backend:** Node.js, Express & TypeScript
-- **Database:** PostgreSQL 16
-- **Real-time audio:** LiveKit and WebRTC
-- **Containers:** Docker and Docker Compose
+## Local deployment
 
-## Prerequisites
-
-Install the following tools before starting:
-
-- [Git](https://git-scm.com/downloads)
-- [Docker Desktop](https://www.docker.com/products/docker-desktop/)
-
-Make sure Docker Desktop is running before executing Docker commands.
-
-## Getting Started
-
-### 1. Clone the Repository
+Install Git, Docker Engine with Compose v2, and Python 3. From repository root:
 
 ```bash
-git clone <REPOSITORY_URL>
-cd Room
+python3 backend/scripts/configure-local.py
+docker compose up -d --build --wait --wait-timeout 180
+python3 backend/scripts/compose-smoke.py
+bash backend/scripts/test-backup-restore.sh
+docker compose exec -T -e SMOKE_LIVEKIT_URL=http://livekit:7880 backend node scripts/media-service-smoke.cjs
+python3 backend/scripts/privacy-log-smoke.py
 ```
 
-Replace `<REPOSITORY_URL>` with the Git repository URL.
+Open `http://localhost:8080`. The generator creates ignored random local credentials and refuses to overwrite existing configuration. The default media-token route fails closed until Members 1/2 integrate verified authentication and session membership. For an explicitly insecure, loopback-only prototype demonstration, see [operations](OPERATIONS.md); production rejects development tokens.
 
-### 2. Configure Environment Variables
+Service order is PostgreSQL health → verified Prisma migrations → API health → frontend/reverse proxy, with healthy LiveKit required by the API. PostgreSQL and optional ASR are private. Use `docker compose down` to stop services while retaining database data. Do not delete volumes to resolve configuration or migration problems.
 
-The project uses environment variables for application configuration and credentials.
-
-Create your local `.env` file from the example:
-
-**Windows PowerShell**
-
-```powershell
-Copy-Item .env.example .env
-```
-
-**macOS / Linux**
+## CI without changing folders
 
 ```bash
-cp .env.example .env
+bash backend/scripts/ci.sh checks
+# Only on an isolated disposable Docker runner, using synthetic data:
+bash backend/scripts/ci.sh integration
 ```
 
-Open `.env` and fill in the required values.
+The runner-neutral script checks the layout, scans source for secrets, verifies Gitleaks, installs locked dependencies in a disposable copy, type-checks source/tests, runs security and feature tests, builds both applications and runs dependency audits. Integration mode additionally runs Compose health/migrations, proxy/media/log checks and a synthetic backup/restore. Connect this command to your existing runner; no hosted workflow or hosted run is claimed. Override ports/subnet together when running alongside another stack; see the runbook.
 
-Check `.env.example` for the environment variables required by this version of the project. These may include:
+## Member 5 deliverables
 
-- Database connection settings
-- LiveKit API key and secret
-- Backend configuration
-- Other service credentials used by Docker Compose
+- [Threat model](THREAT-MODEL.md), [SEC-01–08/OPS matrix](SECURITY-CONTROLS.md), [findings register](SECURITY-FINDINGS.md).
+- [Validation/error/auth/CSRF/media handoff](SECURITY-PATTERNS.md).
+- [Operations, HTTPS/WSS, TURN, backups and incidents](OPERATIONS.md).
+- [Security/acceptance test report](SECURITY-TEST-REPORT.md), [machine-readable evidence](security-evidence.json), [implementation report](report.md).
 
-Use the correct values for your local environment. Do not copy real credentials into `.env.example`.
-
-**Security:** Never commit `.env`, API secrets, passwords, or access tokens to Git. Keep `.env.example` limited to variable names and safe placeholder values.
-
-### 3. Start the Project
-
-From the project root, run:
-
-```bash
-docker compose up -d --build
-```
-
-Docker Compose builds the application images and starts the configured services in the background. The first run may take several minutes while Docker downloads images and installs dependencies.
-
-### 4. Check Service Status
-
-```bash
-docker compose ps
-```
-
-Check the logs if a service fails to start:
-
-```bash
-docker compose logs --tail 100
-```
-
-To inspect a particular service:
-
-```bash
-docker compose logs --tail 100 api
-```
-
-Use the service names defined in `docker-compose.yml` if they differ from the example.
-
-### 5. Open Room
-
-When the services are running, open:
-
-| Service | Local address |
-|---|---|
-| Room frontend | http://localhost:5173 |
-| Backend health check | http://localhost:4000/health |
-| LiveKit server | ws://localhost:7880 |
-
-The backend health endpoint should return a successful response when the API is available.
-
-The LiveKit WebSocket address is used by the browser for real-time communication in the local development setup.
-
-### 6. Stop the Project
-
-To stop the running containers:
-
-```bash
-docker compose down
-```
-
-This stops and removes the Compose containers but preserves named database volumes.
-
-To start the project again:
-
-```bash
-docker compose up -d
-```
-
-**Do not use `docker compose down -v`** unless you intentionally want to remove the associated named volumes and potentially delete local database data.
-
-## Troubleshooting
-
-### Docker is not running
-
-Start Docker Desktop and wait until its engine is ready.
-
-### A service fails to start
-
-Check the status and logs:
-
-```bash
-docker compose ps
-docker compose logs --tail 100
-```
-
-### Environment configuration errors
-
-Confirm that `.env` exists in the project root and contains all required variables with valid values.
-
-### Audio calls do not connect
-
-Room uses LiveKit and WebRTC for browser audio. A successful backend connection does not guarantee that the media connection works.
-
-If the call fails, check the LiveKit logs and network configuration. WebRTC may require additional UDP connectivity and appropriate ICE candidate addresses.
-
-## Development Notes
-
-- Keep `.env` local and never commit secrets.
-- Use `.env.example` to document required configuration variables.
-- Check service logs before changing Docker or network settings.
-- Preserve the database volume when restarting the development environment.
-
-## Project Status
-
-Room is under active development. Some features, including real-time audio connectivity, may require further testing and configuration.
+Real HTTPS certificates, cross-network browser audio, ASR/model/provider integration, complete transcript deletion and load/accessibility targets require separate evidence. A healthy local stack and common-control tests do not certify the complete SRS user journey.
