@@ -18,6 +18,19 @@ export const createRoomSchema = z.strictObject({
   description: z.string().trim().max(2000).optional(),
   durationSeconds: z.number().int().min(120).max(1800).default(600),
 });
+export const joinRoomSchema = z.strictObject({
+  inviteCode: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
+});
+export const updateRoomSchema = z.strictObject({
+  title: z.string().trim().min(5).max(200).optional(),
+  description: z.string().trim().max(2000).optional(),
+  durationSeconds: z.number().int().min(120).max(1800).optional(),
+}).refine((value) => Object.values(value).some((item) => item !== undefined));
+export const readySchema = z.strictObject({
+  consentVersion: z.string().trim().min(1).max(64),
+  ready: z.boolean(),
+});
+export const emptyBodySchema = z.strictObject({});
 export const historyQuerySchema = z.strictObject({
   page: z.string().regex(/^[1-9]\d{0,5}$/).transform(Number).default(1),
   limit: z.string().regex(/^(?:[1-9]|[1-4]\d|50)$/).transform(Number).default(20),
