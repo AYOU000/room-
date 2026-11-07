@@ -137,6 +137,8 @@ Creator-only. Requires both participants to have current consent, be ready, and 
 
 Authenticated session member only. The production request body is empty; server resolves the LiveKit room and identity from the authenticated account and session membership. This is intentionally different from the current development token path, which accepts `roomName` and `identity` in the request.
 
+A member who has accepted the current consent notice may receive a waiting-room token for audio preflight with `canPublish: false` and intended subscriptions only. After the session becomes active, the member requests a fresh token with microphone-only publish permission. Active-session renewal is allowed only while membership and active state remain valid. No token is issued for cancelled or ended sessions.
+
 Response:
 ```json
 {
@@ -148,7 +150,7 @@ Response:
 }
 ```
 
-Proposed token lifetime: five minutes. Reconnection/renewal requires a fresh membership and active-state check; it cannot reopen a terminal session. The LiveKit token is returned only to the authenticated participant and must never be logged, persisted in localStorage, or included in analytics.
+Proposed token lifetime: five minutes. Every issuance or renewal rechecks membership, consent, and state-specific grants; it cannot reopen a terminal session. The LiveKit token is returned only to the authenticated participant and must never be logged, persisted in localStorage, or included in analytics.
 
 ### Finish
 
@@ -235,13 +237,13 @@ Every server event has this envelope:
 
 ### Human participant grant
 
-A server-issued LiveKit grant for a human participant is bound to the session-derived room name and server-derived identity. It permits:
+A server-issued LiveKit grant for a human participant is bound to the session-derived room name and server-derived identity. In the waiting state, it permits joining and intended subscriptions for audio preflight, but has `canPublish: false`. Once the session is active, a newly issued grant permits:
 
 - joining that one room;
 - publishing microphone audio only (`canPublishSources: [MICROPHONE]`);
 - subscribing to intended audio tracks.
 
-It denies camera/screen publication, data publication, room administration, recording, and metadata updates. The client cannot choose the grant's room or identity. Permission to use the browser microphone is separately requested by the browser and does not itself authorize room membership.
+Both grant types deny camera/screen publication, data publication, room administration, recording, and metadata updates. The client cannot choose the grant's room or identity. Permission to use the browser microphone is separately requested by the browser and does not itself authorize room membership.
 
 ### ASR service grant
 
