@@ -145,6 +145,7 @@ Response:
   "sessionId": "uuid",
   "roomName": "room_<server-generated-session-id>",
   "participantId": "uuid",
+  "grantMode": "preflight",
   "token": "<short-lived LiveKit JWT>",
   "serverUrl": "wss://media.example"
 }
