@@ -10,3 +10,4 @@ coverage/
 Thumbs.db
 
 backend/src/generated/
+*.tsbuildinfo
