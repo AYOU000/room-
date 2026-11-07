@@ -6,6 +6,10 @@ import { AppError, errorHandler, notFound } from "./security-errors.js";
 import { requestContext, securityHeaders, requireJson, validateOrigin } from "./security-http.js";
 import { createRateLimiter } from "./security-rate-limit.js";
 import { mediaTokenRequestSchema, validateBody } from "./security-validation.js";
+import { PrismaClient } from "@prisma/client";
+import { createRoomRouter } from "./room-routes.js";
+import { PrismaRoomLifecycleService, type RoomLifecycleService } from "./room-lifecycle.js";
+import type { RequestHandler } from "express";
 
 // Members 1 and 2 supply verified authentication, membership, consent and state.
 // Never return browser-selected identities from a production authorizer.
@@ -16,9 +20,15 @@ export type AuditRecord = {
   errorCode?: string; durationMs: number;
 };
 
+const defaultPrisma = new PrismaClient();
+
 export function createApp(options: {
   config?: SecurityConfig;
   authorizeMedia?: MediaAuthorizer;
+  roomService?: RoomLifecycleService;
+  authenticateUser?: RequestHandler;
+  consentVersion?: string;
+  now?: () => Date;
   audit?: (record: AuditRecord) => void;
 } = {}) {
   const config = options.config ?? loadSecurityConfig();
@@ -44,6 +54,8 @@ export function createApp(options: {
   app.get("/health", (_req, res) => {
     res.json({ status: "ok", service: "room-api" });
   });
+
+  const roomService = options.roomService ?? new PrismaRoomLifecycleService(defaultPrisma);
 
   app.post("/api/rooms/token", validateBody(mediaTokenRequestSchema), async (req, res) => {
     let media: AuthorizedMedia;
@@ -71,6 +83,12 @@ export function createApp(options: {
     });
     res.json({ ...media, token: await token.toJwt(), serverUrl: config.livekitPublicUrl });
   });
+  app.use(createRoomRouter({
+    service: roomService,
+    authenticate: options.authenticateUser,
+    consentVersion: options.consentVersion,
+    now: options.now,
+  }));
   app.use(notFound);
   app.use(errorHandler);
   return app;

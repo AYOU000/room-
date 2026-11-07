@@ -2,6 +2,7 @@
 """Keep every main path and folder; never rewrite main's tracked dependencies."""
 import subprocess
 import sys
+import re
 from pathlib import Path
 
 root = Path(__file__).resolve().parents[2]
@@ -17,6 +18,9 @@ after = {p for p in git('ls-files', '--cached', '--others', '--exclude-standard'
          if p and (root / p).is_file()}
 folders = lambda files: {str(parent) for p in files for parent in Path(p).parents}
 new_folders = folders(after) - folders(before)
+# Prisma's migration runner requires one new versioned directory per migration.
+# Permit only that additive path; every other new directory remains blocked.
+new_folders -= {p for p in new_folders if re.fullmatch(r'backend/prisma/migrations/\d{14}_[a-z0-9_]+', p)}
 missing = before - after
 vendor_changes = git('diff', '--name-only', '-z', baseline, '--', 'backend/node_modules')
 vendor_additions = {p for p in after - before if p.startswith('backend/node_modules/')}
@@ -27,4 +31,4 @@ if new_folders or missing or any(vendor_changes) or vendor_additions:
         for name in sorted(names):
             print(f'FAIL: {kind}: {name}')
     raise SystemExit(1)
-print(f'PASS: all {len(before)} main paths retained; folder set identical; tracked dependencies unchanged.')
+print(f'PASS: all {len(before)} main paths retained; no unapproved folders added; tracked dependencies unchanged.')

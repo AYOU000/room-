@@ -14,6 +14,10 @@ export const errorMessages = {
   RATE_LIMITED: "Too many requests. Wait before trying again.",
   SERVICE_UNAVAILABLE: "A required service is temporarily unavailable.",
   MEDIA_AUTHORIZATION_UNAVAILABLE: "Room access is not available yet.",
+  ROOM_FULL: "This room is full.",
+  NOT_READY: "Both participants must be ready before the debate can start.",
+  AUDIO_NOT_CONNECTED: "Both participants must have a usable audio connection.",
+  INVITE_INVALID: "This invite is invalid or has expired.",
   INTERNAL_ERROR: "The request could not be completed.",
 } as const;
 export type ErrorCode = keyof typeof errorMessages;

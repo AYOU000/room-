@@ -7,9 +7,10 @@ COPY package.json package-lock.json ./
 RUN --mount=type=secret,id=proxy_ca \
     if [ -f /run/secrets/proxy_ca ]; then export NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca; fi; \
     npm ci --strict-ssl=true --no-audit --no-fund
+COPY prisma ./prisma
 COPY tsconfig.json ./
 COPY src ./src
-RUN npm run build
+RUN npm run db:generate && npm run build
 
 FROM base
 ENV NODE_ENV=production PORT=4000

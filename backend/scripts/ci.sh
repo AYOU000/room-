@@ -38,6 +38,7 @@ export npm_config_cache="$ci_dir/npm-cache"
 export CI=true NODE_ENV=test
 npm ci --prefix backend --no-audit --no-fund
 npm ci --prefix frontend --no-audit --no-fund
+npm run db:generate --prefix backend
 npm run typecheck --prefix backend
 npm run typecheck --prefix frontend
 npm test --prefix backend
