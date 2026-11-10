@@ -7,9 +7,102 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum RoomStatus {
+  WAITING
+  ACTIVE
+  CANCELLED
+  CLOSED
+}
+
+enum SessionState {
+  WAITING
+  ACTIVE
+  FINISHING
+  ENDED
+  CANCELLED
+}
+
+enum SessionEndReason {
+  TIMER
+  USER_END
+  DISCONNECT
+  SERVICE_FAILURE
+}
+
+enum EvaluationStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  UNAVAILABLE
+}
+
 model User {
   id        String   @id @default(uuid()) @db.Uuid
   createdAt DateTime @default(now())
 
+  roomsCreated Room[] @relation("RoomCreator")
+  participants SessionParticipant[]
+
   @@map("users")
+}
+
+model Room {
+  id             String     @id @default(uuid()) @db.Uuid
+  creatorId      String     @db.Uuid
+  title          String     @db.VarChar(200)
+  description    String?    @db.VarChar(2000)
+  inviteCodeHash String     @unique @db.VarChar(64)
+  inviteExpiresAt DateTime
+  durationSeconds Int
+  status         RoomStatus @default(WAITING)
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  creator User           @relation("RoomCreator", fields: [creatorId], references: [id], onDelete: Restrict)
+  session DebateSession?
+
+  @@index([creatorId, createdAt])
+  @@map("rooms")
+}
+
+model DebateSession {
+  id                 String            @id @default(uuid()) @db.Uuid
+  roomId             String            @unique @db.Uuid
+  topicSnapshot      String            @db.VarChar(200)
+  durationSeconds   Int
+  state              SessionState      @default(WAITING)
+  endReason          SessionEndReason?
+  startedAt          DateTime?
+  endsAt             DateTime?
+  endedAt            DateTime?
+  evaluationStatus   EvaluationStatus  @default(PENDING)
+  captureComplete    Boolean           @default(false)
+  createdAt          DateTime          @default(now())
+
+  room         Room                 @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  participants SessionParticipant[]
+
+  @@index([state, endsAt])
+  @@map("debate_sessions")
+}
+
+model SessionParticipant {
+  id             String   @id @default(uuid()) @db.Uuid
+  sessionId      String   @db.Uuid
+  userId         String   @db.Uuid
+  slot           Int
+  consentAt      DateTime?
+  consentVersion String?  @db.VarChar(64)
+  isReady        Boolean  @default(false)
+  audioConnected Boolean  @default(false)
+  joinedAt       DateTime @default(now())
+
+  session DebateSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user    User          @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([sessionId, userId])
+  @@unique([sessionId, slot])
+  @@index([userId, joinedAt])
+  @@map("debate_participants")
 }

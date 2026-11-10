@@ -1,0 +1,20 @@
+# Security control matrix
+
+Member 5 • SRS/TEAM v1.0 (25 October 2026) • main baseline `2d25d68` • 6 November 2026.
+
+| Requirement | Delivered common control | Integration owner and release gate | Evidence |
+| --- | --- | --- | --- |
+| INT-01, SEC-01 | Strict Zod body/input/event schemas; unknown-field rejection; JSON-only 16 KiB limits; safe error codes and generated request IDs | Members 1–4 validate every new params/query/cookie/event/cache/provider boundary | `backend/scripts/security.test.ts`; proxy smoke |
+| SEC-02 | React text errors; no raw exception reflection; CSP; restricted database application role | 1 parameterized queries; 3 safe rendering/cache; 4 bounded data-only outputs | Input attacks and error redaction tested; absent module queries not certified |
+| SEC-03 | Password-preserving registration schema; no sensitive audit fields | 1 implements Argon2id ≥19 MiB/t=2/p=1, salts and host benchmark | Preservation test; actual password hashing blocked on Member 1 |
+| SEC-04 | Server-derived authorizer hook; default-denied media tokens; single-room microphone-only 5-minute grants; no token caching | 1 access-JWT/cookies/refresh-family rotation and replay; 2 session membership and active shutdown | Grant, wrong-key and expiry tests; no claim of refresh-token replay implementation |
+| SEC-05 | Exact Origin/CORS; session-bound synchronizer-CSRF helper; CSP/frame isolation/permissions headers; production HTTPS/WSS validation and TLS profile | 1 binds CSRF to verified session; 2 authenticates WS + Origin; operator DNS/certs | Origin/CSRF/config tests; Caddy configuration validation; actual public TLS unrun |
+| SEC-06 | 60 requests/IP/15 min; bounded counters; Retry-After; explicit proxy trust and HTTP timeouts | 1 failed-login/account backoff; 2 room/account limit; 4 evaluation/session uniqueness; shared atomic counters before multiple replicas | Spoofing/expiry/saturation tests; account policies remain feature work |
+| SEC-07 | Private optional ASR profile; no arbitrary URL-fetch interface; AI/retrieval/SSRF contracts in SECURITY-PATTERNS.md | 4 implements approved provider, DNS/redirect controls, strict scores/citations, memory purge and service adapter | Design/handoff only; no end-to-end prompt/SSRF assertion |
+| SEC-08 | Random ignored secrets; restricted API DB role; locked exact direct dependencies; dependency/secret gates; digest-pinned main images | Operator rotates any reused historical values; 4 locks complete inference/model bundle | Current source scans and npm audits; original tracked dependency files retained unchanged by explicit user constraint |
+| OPS-01 | Non-root API/static proxy; health/dependency ordering; native Prisma migration job; durable metadata volume; optional private Python/FFmpeg ASR scaffold | 4 supplies project-owned authenticated LiveKit→ASR adapter and tested model | Local clean-volume core stack healthy and migration complete; transcription profile not built/run |
+| OPS-02 | Loopback defaults, private DB/ASR, HTTPS/WSS profile and configurable media ports/subnet | 2/3 and operator prove two-network audio, ICE/TURN and named browsers | Proxy and authenticated LiveKit service smoke; browser media/public TLS unrun |
+| OPS-03 | Content-free audit records, bounded logs, safe backup and separate-database restore scripts, incident/restart runbook | 1/2/4 reconcile unfinished sessions and mark lost-buffer evaluations unavailable | Synthetic dump/restore, app-role and log-marker checks; full restart recovery absent |
+| NFR-07 | No added speech persistence; redaction tests; private ASR without logs/audio volumes | 3 browser terminal/cross-tab purge; 4 bounded memory expiry; all provider retention | Synthetic request markers absent from core logs; complete transcript lifecycle unimplemented |
+
+Member 5 supplies common controls, review gates and automation. Feature ownership remains as assigned in TEAM. Status is evidenced in `security-evidence.json` and `SECURITY-TEST-REPORT.md`; nothing here grants public-release approval.
