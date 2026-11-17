@@ -77,6 +77,9 @@ model DebateSession {
   endsAt             DateTime?
   endedAt            DateTime?
   evaluationStatus   EvaluationStatus  @default(PENDING)
+  eventSequence      Int               @default(0)
+  mediaClosed        Boolean           @default(false)
+  mediaGrantExpiresAt DateTime?
   captureComplete    Boolean           @default(false)
   createdAt          DateTime          @default(now())
 
@@ -95,6 +98,9 @@ model SessionParticipant {
   consentAt      DateTime?
   consentVersion String?  @db.VarChar(64)
   isReady        Boolean  @default(false)
+  microphoneReady Boolean @default(false)
+  audioObservedAt DateTime?
+  disconnectDeadline DateTime?
   audioConnected Boolean  @default(false)
   joinedAt       DateTime @default(now())
 

@@ -264,15 +264,16 @@ export class PrismaRoomLifecycleService implements RoomLifecycleService {
       this.requireMember(room, userId);
       if (room.creatorId !== userId) throw new AppError(403, "FORBIDDEN");
       const session = room.session!;
-      if (session.state === "ACTIVE" || session.state === "FINISHING" || session.state === "ENDED") {
+      if (session.state === "ACTIVE" || session.state === "FINISHING" || session.state === "ENDED" || session.state === "CANCELLED") {
         return toSnapshot(room, now);
       }
       if (room.status !== "WAITING" || session.state !== "WAITING") throw new AppError(409, "STATE_CONFLICT");
+      if (room.inviteExpiresAt <= now) throw new AppError(409, "STATE_CONFLICT");
       if (session.participants.length !== 2 || session.participants.some((participant) =>
         !participant.isReady || !participant.consentAt || participant.consentVersion !== consentVersion)) {
         throw new AppError(409, "NOT_READY");
       }
-      if (session.participants.some((participant) => !participant.audioConnected)) {
+      if (session.participants.some((participant) => !participant.audioConnected || !participant.microphoneReady || !participant.audioObservedAt || now.getTime() - participant.audioObservedAt.getTime() > 5000)) {
         throw new AppError(409, "AUDIO_NOT_CONNECTED");
       }
       const endsAt = new Date(now.getTime() + session.durationSeconds * 1000);
@@ -293,7 +294,7 @@ export class PrismaRoomLifecycleService implements RoomLifecycleService {
       const room = await this.loadRoom(tx, initial.roomId);
       this.requireMember(room, userId);
       const session = room.session!;
-      if (session.state === "FINISHING" || session.state === "ENDED") return toSnapshot(room, now);
+      if (session.state === "FINISHING" || session.state === "ENDED" || session.state === "CANCELLED") return toSnapshot(room, now);
       if (session.state !== "ACTIVE") throw new AppError(409, "STATE_CONFLICT");
       await tx.debateSession.update({
         where: { id: session.id },
@@ -305,10 +306,10 @@ export class PrismaRoomLifecycleService implements RoomLifecycleService {
   }
 
   async markAudioConnection(sessionId: string, userId: string, connected: boolean): Promise<void> {
-    // Call only after verifying the LiveKit event signature and room/identity mapping.
+    // Called only from authenticated LiveKit server observations.
     const result = await this.prisma.sessionParticipant.updateMany({
       where: { sessionId, userId, session: { state: { in: ["WAITING", "ACTIVE"] } } },
-      data: { audioConnected: connected },
+      data: { audioConnected: connected, audioObservedAt: new Date(), ...(connected ? { disconnectDeadline: null } : { microphoneReady: false }) },
     });
     if (result.count === 0) throw new AppError(404, "NOT_FOUND");
   }
