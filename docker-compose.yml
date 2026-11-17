@@ -8,7 +8,7 @@ x-api-env: &api-env
   DATABASE_URL: postgresql://${POSTGRES_APP_USER:-room_app}:${POSTGRES_APP_PASSWORD:?Run python3 backend/scripts/configure-local.py}@postgres:5432/${POSTGRES_DB:-room_db}?schema=public
   LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:?Run python3 backend/scripts/configure-local.py}
   LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:?Run python3 backend/scripts/configure-local.py}
-  LIVEKIT_PUBLIC_URL: ${LIVEKIT_PUBLIC_URL:-ws://localhost:7880}
+  LIVEKIT_PUBLIC_URL: ${LIVEKIT_PUBLIC_URL:-ws://localhost:7883}
   ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:8080}
   ENABLE_DEV_MEDIA_TOKENS: ${ENABLE_DEV_MEDIA_TOKENS:-false}
   TRUSTED_PROXY_IPS: ${FRONTEND_PROXY_IP:-172.30.50.10}
@@ -61,7 +61,7 @@ services:
     volumes:
       - ./.local/livekit.yaml:/run/livekit.yaml:ro
     ports:
-      - '${MEDIA_BIND_IP:-127.0.0.1}:${LIVEKIT_HTTP_PORT:-7880}:7880'
+      - '${MEDIA_BIND_IP:-127.0.0.1}:${LIVEKIT_HTTP_PORT:-7883}:7880'
       - '${MEDIA_BIND_IP:-127.0.0.1}:${LIVEKIT_TCP_PORT:-7881}:7881'
       - '${MEDIA_BIND_IP:-127.0.0.1}:${LIVEKIT_UDP_PORT:-7882}:7882/udp'
     networks: [media]
