@@ -72,6 +72,7 @@ export function sessionRuntime(db: PrismaClient, service: PrismaRoomLifecycleSer
     const sequence = row.eventSequence;
     const event = JSON.stringify(sessionEventSchema.parse({ event_id: randomUUID(), session_id: id, type, sequence, server_time: new Date().toISOString(), payload }));
     for (const [socket, subscription] of clients) if (subscription.session === id && socket.readyState === WebSocket.OPEN) {
+      try { await member(id, subscription.user); } catch { socket.close(1008); continue; }
       if (socket.bufferedAmount > 65536) socket.close(1013); else socket.send(event);
     }
   }
@@ -92,6 +93,12 @@ export function sessionRuntime(db: PrismaClient, service: PrismaRoomLifecycleSer
               if (error?.code === 'not_found' || error?.status === 404) return [];
               throw error;
             });
+            const membership = await db.sessionParticipant.findMany({ where: { sessionId: session.id }, select: { userId: true } });
+            for (const peer of connected) {
+              if (!membership.some(p => p.userId === peer.identity) && !(current.state === 'ACTIVE' && peer.identity === `asr_${session.id}`)) {
+                await media.removeParticipant(roomName(session.id), peer.identity);
+              }
+            }
             for (const participant of session.participants) {
               const present = connected.some(p => p.identity === participant.userId);
               if (current.state === 'ACTIVE' && participant.disconnectDeadline && participant.disconnectDeadline <= now) {

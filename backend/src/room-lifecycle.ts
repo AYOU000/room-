@@ -40,6 +40,7 @@ export type CreateRoomInput = {
 };
 
 export interface RoomLifecycleService {
+  leaveRoom?(roomId: string, userId: string, now: Date): Promise<void>;
   readRoom?(roomId: string, userId: string, now: Date): Promise<RoomSnapshot>;
   cancelRoom?(roomId: string, userId: string, now: Date): Promise<RoomSnapshot>;
   createRoom(input: CreateRoomInput): Promise<{ snapshot: RoomSnapshot; inviteCode: string }>;
@@ -137,6 +138,23 @@ export class PrismaRoomLifecycleService implements RoomLifecycleService {
     });
   }
 
+  async leaveRoom(roomId: string, userId: string, now: Date): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      await this.lockRoom(tx, roomId);
+      const room = await this.loadRoom(tx, roomId);
+      this.requireMember(room, userId);
+      if (room.creatorId === userId && room.session!.state === "CANCELLED") return;
+      if (room.status !== "WAITING" || room.session!.state !== "WAITING") throw new AppError(409, "STATE_CONFLICT");
+      if (room.creatorId === userId) {
+        await tx.debateSession.update({ where: { id: room.session!.id }, data: { state: "CANCELLED", endedAt: now } });
+        await tx.room.update({ where: { id: roomId }, data: { status: "CANCELLED", updatedAt: now } });
+      } else {
+        await tx.sessionParticipant.delete({ where: { sessionId_userId: { sessionId: room.session!.id, userId } } });
+      }
+      await tx.sessionParticipant.updateMany({ where: { sessionId: room.session!.id }, data: { isReady: false } });
+    });
+  }
+
   /** Trusted server triggers only: callers must never accept a reason from a browser. */
   async endSession(sessionId: string, reason: "TIMER" | "DISCONNECT" | "SERVICE_FAILURE", now: Date): Promise<void> {
     await this.prisma.$transaction(async (tx) => {
@@ -195,7 +213,7 @@ export class PrismaRoomLifecycleService implements RoomLifecycleService {
         `;
         if (rows.length === 0) throw new AppError(404, "INVITE_INVALID");
         const current = await this.loadRoom(tx, rows[0].id);
-        if (current.status !== "WAITING" || current.inviteExpiresAt <= now) {
+        if (current.status !== "WAITING" || current.session?.state !== "WAITING" || current.inviteExpiresAt <= now) {
           throw new AppError(404, "INVITE_INVALID");
         }
         if (current.creatorId === userId) throw new AppError(409, "STATE_CONFLICT");

@@ -38,6 +38,12 @@ export function createRoomRouter(options: {
   const consentVersion = options.consentVersion ?? "privacy-v1";
   const now = options.now ?? (() => new Date());
 
+  router.post("/api/rooms/:roomId/leave", authenticate, validateBody(emptyBodySchema), async (req, res) => {
+    if (!options.service.leaveRoom) throw new AppError(503, "SERVICE_UNAVAILABLE");
+    await options.service.leaveRoom(pathUuid(req.params.roomId), authenticatedUserId(res), now());
+    res.status(204).end();
+  });
+
   router.get("/api/rooms/:roomId", authenticate, async (req, res) => {
     if (!options.service.readRoom) throw new AppError(503, "SERVICE_UNAVAILABLE");
     res.json(await options.service.readRoom(pathUuid(req.params.roomId), authenticatedUserId(res), now()));
