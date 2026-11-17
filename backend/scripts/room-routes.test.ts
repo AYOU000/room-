@@ -18,6 +18,8 @@ const snapshot: RoomSnapshot = {
 
 function createService(): RoomLifecycleService {
   return {
+    readRoom: vi.fn(async () => snapshot),
+    cancelRoom: vi.fn(async () => ({ ...snapshot, session: { ...snapshot.session, state: "cancelled" } })),
     createRoom: vi.fn(async () => ({ snapshot, inviteCode: "A".repeat(43) })),
     joinRoom: vi.fn(async () => snapshot),
     updateRoom: vi.fn(async () => snapshot),
@@ -128,5 +130,27 @@ describe("room lifecycle routes", () => {
     expect(invalid.status).toBe(400);
     expect(invalid.body.error.code).toBe("INVALID_INPUT");
     expect(service.finishSession).toHaveBeenCalledTimes(1);
+  });
+});
+
+ describe("room snapshot and cancellation", () => {
+  it("requires authentication for reads", async () => {
+    const service = createService();
+    const response = await request(testApp(service)).get(`/api/rooms/${roomId}`);
+    expect(response.status).toBe(503);
+    expect(service.readRoom).not.toHaveBeenCalled();
+  });
+  it("passes verified identity to read and cancel", async () => {
+    const service = createService();
+    const app = testApp(service, authenticate);
+    expect((await request(app).get(`/api/rooms/${roomId}`)).status).toBe(200);
+    expect(service.readRoom).toHaveBeenCalledWith(roomId, creatorId, now);
+    expect((await request(app).post(`/api/rooms/${roomId}/cancel`).send({})).body.session.state).toBe("cancelled");
+    expect(service.cancelRoom).toHaveBeenCalledWith(roomId, creatorId, now);
+  });
+  it("rejects client-selected cancellation reasons", async () => {
+    const service = createService();
+    expect((await request(testApp(service, authenticate)).post(`/api/rooms/${roomId}/cancel`).send({ endReason: "timer" })).status).toBe(400);
+    expect(service.cancelRoom).not.toHaveBeenCalled();
   });
 });

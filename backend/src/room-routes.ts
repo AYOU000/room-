@@ -38,6 +38,16 @@ export function createRoomRouter(options: {
   const consentVersion = options.consentVersion ?? "privacy-v1";
   const now = options.now ?? (() => new Date());
 
+  router.get("/api/rooms/:roomId", authenticate, async (req, res) => {
+    if (!options.service.readRoom) throw new AppError(503, "SERVICE_UNAVAILABLE");
+    res.json(await options.service.readRoom(pathUuid(req.params.roomId), authenticatedUserId(res), now()));
+  });
+
+  router.post("/api/rooms/:roomId/cancel", authenticate, validateBody(emptyBodySchema), async (req, res) => {
+    if (!options.service.cancelRoom) throw new AppError(503, "SERVICE_UNAVAILABLE");
+    res.json(await options.service.cancelRoom(pathUuid(req.params.roomId), authenticatedUserId(res), now()));
+  });
+
   // Member 1 replaces the default fail-closed middleware with verified auth.
   router.post("/api/rooms", authenticate, validateBody(createRoomSchema), async (req, res) => {
     const body = req.body as ReturnType<typeof createRoomSchema.parse>;

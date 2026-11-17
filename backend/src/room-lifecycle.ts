@@ -40,6 +40,8 @@ export type CreateRoomInput = {
 };
 
 export interface RoomLifecycleService {
+  readRoom?(roomId: string, userId: string, now: Date): Promise<RoomSnapshot>;
+  cancelRoom?(roomId: string, userId: string, now: Date): Promise<RoomSnapshot>;
   createRoom(input: CreateRoomInput): Promise<{ snapshot: RoomSnapshot; inviteCode: string }>;
   joinRoom(userId: string, inviteCode: string, now: Date): Promise<RoomSnapshot>;
   updateRoom(roomId: string, userId: string, changes: { title?: string; description?: string; durationSeconds?: number }, now: Date): Promise<RoomSnapshot>;
@@ -111,6 +113,50 @@ export class PrismaRoomLifecycleService implements RoomLifecycleService {
     if (!room.session?.participants.some((participant) => participant.userId === userId)) {
       throw new AppError(404, "NOT_FOUND");
     }
+  }
+
+  async readRoom(roomId: string, userId: string, now: Date): Promise<RoomSnapshot> {
+    return this.prisma.$transaction(async (tx) => {
+      const room = await this.loadRoom(tx, roomId);
+      this.requireMember(room, userId);
+      return toSnapshot(room, now);
+    });
+  }
+
+  async cancelRoom(roomId: string, userId: string, now: Date): Promise<RoomSnapshot> {
+    return this.prisma.$transaction(async (tx) => {
+      await this.lockRoom(tx, roomId);
+      const room = await this.loadRoom(tx, roomId);
+      this.requireMember(room, userId);
+      if (room.creatorId !== userId) throw new AppError(403, "FORBIDDEN");
+      if (room.session!.state === "CANCELLED") return toSnapshot(room, now);
+      if (room.session!.state !== "WAITING") throw new AppError(409, "STATE_CONFLICT");
+      await tx.debateSession.update({ where: { id: room.session!.id }, data: { state: "CANCELLED", endedAt: now } });
+      await tx.room.update({ where: { id: roomId }, data: { status: "CANCELLED", updatedAt: now } });
+      return toSnapshot(await this.loadRoom(tx, roomId), now);
+    });
+  }
+
+  /** Trusted server triggers only: callers must never accept a reason from a browser. */
+  async endSession(sessionId: string, reason: "TIMER" | "DISCONNECT" | "SERVICE_FAILURE", now: Date): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      const session = await tx.debateSession.findUnique({ where: { id: sessionId } });
+      if (!session) return;
+      await this.lockRoom(tx, session.roomId);
+      const room = await this.loadRoom(tx, session.roomId);
+      if (room.session!.state !== "ACTIVE") return;
+      if (reason === "TIMER" && (!room.session!.endsAt || room.session!.endsAt > now)) return;
+      await tx.debateSession.update({ where: { id: sessionId }, data: { state: "FINISHING", endReason: reason, endedAt: now } });
+      await tx.room.update({ where: { id: session.roomId }, data: { status: "CLOSED", updatedAt: now } });
+    });
+  }
+
+  /** Invoke only after idempotent media shutdown and bounded transcript drain. */
+  async completeFinalization(sessionId: string): Promise<void> {
+    await this.prisma.debateSession.updateMany({
+      where: { id: sessionId, state: "FINISHING" },
+      data: { state: "ENDED" },
+    });
   }
 
   async createRoom(input: CreateRoomInput): Promise<{ snapshot: RoomSnapshot; inviteCode: string }> {
