@@ -1,23 +1,11 @@
-# Room lifecycle implementation status
+# Room contract implementation
 
-This branch is a draft and is not ready for deployment.
+The four requested lifecycle/interface/admission/protocol requirements are represented in code and documented in ROOM-TIMER-MEDIA-CONTRACTS.md section 12.
 
-Added membership-gated room reads, creator cancellation, trusted end-reason transitions, finalization transition, JWT verification via configured HTTPS JWKS, session media grants, a server-only ASR grant helper, reconciliation, and snake_case WebSocket envelopes.
+Added durable disconnect deadlines and event sequence numbers, terminal cleanup retries, authenticated audio preflight, current LiveKit observation checks, strict snapshot/event schemas, heartbeat and periodic subscription authorization checks. No solo/open phase exists.
 
-Configure AUTH_ISSUER, AUTH_AUDIENCE and AUTH_JWKS_URL for an identity provider issuing RS256/ES256 tokens whose subject is the existing users table UUID. Accounts must already exist; this change does not provision users. Set LIVEKIT_INTERNAL_URL to the backend-accessible LiveKit HTTP service. Existing LiveKit credentials and public URL configuration also apply.
+Deployment needs migration 20261117120000_session_runtime, AUTH_ISSUER/AUTH_AUDIENCE/AUTH_JWKS_URL for RS256/ES256 access tokens with existing user UUID subjects, and LiveKit credentials plus LIVEKIT_INTERNAL_URL. This implementation does not add registration or login. Run one controller process.
 
-WebSocket clients connect to /api/events and send one initial JSON message with authorization (Bearer token) and session_id. Do not put credentials in URLs. Event payloads contain room snapshots. The demo frontend is not wired to this protocol yet.
+The demo frontend is not the real session flow. Its replacement, ASR capture/drain and evaluation adapters remain separate integration tasks. With no capture adapter, evaluation is explicitly unavailable. Microphone readiness is browser-reported capability combined with server-observed LiveKit connectivity, not proof of audible speech.
 
-## Remaining acceptance work
-
-- Persist disconnect deadlines and event sequences across restarts; current maps are process-local, so run no production workload on this draft.
-- Add heartbeat, subscription token-expiry handling, and connection quotas.
-- Verify usable microphone capability during preflight, beyond LiveKit participant presence.
-- Wire the real frontend to authentication, consent, ready/start/finish, media tokens and events; the existing debate page remains sample data.
-- Integrate ASR start/stop and bounded transcript drain. Until that exists finalization marks evaluation unavailable.
-- Add database concurrency tests, LiveKit integration tests, and restart recovery tests. Current passing route tests use mocked services and do not validate real PostgreSQL transitions.
-- Reconcile cancellation/media cleanup retries and stale tokens against terminal room state.
-
-## Validation
-
-Backend typecheck passes. Backend test suite: 64 tests passed. No live PostgreSQL/LiveKit or browser end-to-end run performed.
+Validation: backend typecheck and automated tests; no live PostgreSQL, LiveKit, or two-browser acceptance run was available in this workspace. Do not treat unit tests as production certification. Keep the PR in draft until live acceptance testing and the consuming client integration are complete.

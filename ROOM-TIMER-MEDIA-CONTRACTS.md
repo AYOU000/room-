@@ -292,3 +292,26 @@ Official speaker identity is resolved from the authenticated LiveKit track owner
 - Confirm LiveKit participant webhook versus backend SDK event source and how the ASR service receives short-lived, per-session credentials.
 - Confirm the deployment's public LiveKit URL, ICE/TURN plan, supported browsers, and whether a separate ASR service identity is provisioned per session.
 - The current repository has a health route and a development media-token endpoint with an optional production authorizer. Room/session routes, authenticated membership, timer persistence, event transport, webhook verification, and media cleanup are not yet implemented. Treat this document as a target contract, not evidence those behaviors already exist.
+
+## 12. Implemented wire contract and integration requirements (17 November 2026)
+
+The API prefix is `/api`. Implemented request schemas live in `backend/src/security-validation.ts`; snapshots and the `session.state` envelope are validated by `backend/src/room-contracts.ts`. Earlier statements in section 11 describing all room routes as unimplemented are historical and superseded by this section.
+
+| Method/path | Request | Response |
+|---|---|---|
+| POST /api/rooms | title, optional description, durationSeconds | 201 snapshot plus one-time inviteCode |
+| POST /api/rooms/join | inviteCode | 200 snapshot |
+| GET /api/rooms/:roomId | none | 200 member snapshot |
+| PATCH /api/rooms/:roomId | changed title/description/durationSeconds | 200 snapshot; readiness reset |
+| POST /api/rooms/:roomId/ready | consentVersion, ready | 200 snapshot |
+| POST /api/rooms/:roomId/start | empty object | 200 snapshot with server timestamps |
+| POST /api/rooms/:roomId/cancel | empty object | 200 cancelled snapshot; creator only |
+| POST /api/sessions/:sessionId/finish | empty object | 200 snapshot; user_end when active |
+| POST /api/sessions/:sessionId/media-token | empty object | sessionId, participantId, roomName, grantMode, token, serverUrl |
+| POST /api/sessions/:sessionId/audio-preflight | microphoneReady boolean | 204; verifies LiveKit membership |
+
+Preflight sequence: acknowledge consent, obtain a non-publishing waiting token, connect to LiveKit, request a local microphone using getUserMedia, verify a live enabled audio track, and send microphoneReady=true. On permission loss, device failure or local track end send false. The server additionally requires a LiveKit observation within five seconds at start. Hardware readiness is necessarily a client acknowledgement; it does not prove audible speech or physical human identity. Two distinct authenticated accounts are the enforceable human-slot boundary. ASR uses the server-only asrToken helper and never creates a participant row.
+
+The browser retains access tokens in memory. WebSocket connects to `/api/events` with an allowed Origin and sends one initial frame `{ "authorization": "Bearer …", "session_id": "uuid" }` within five seconds. Further application frames are rejected; protocol ping/pong handles liveness. Subscriptions have periodic token/membership revalidation, four connections per account and 100 overall. Each session.state payload is the validated snapshot. Sequences are stored in PostgreSQL; clients ignore old/duplicate sequences and GET the room after gaps or reconnect. No event history or transcript is stored by this controller. Deployment currently supports one controller process; cross-process fanout is not implemented.
+
+Apply migration `20261117120000_session_runtime` before starting. Disconnect deadlines and event sequences survive restart. Cleanup is retried for terminal sessions; previously issued media grants are accounted for until expiry. A media dependency failure ends an active session with service_failure. Evaluation status remains independent and is unavailable when no transcript/evaluation adapter exists. Full ASR and evaluation engines, registration/login screens, and replacing the demo frontend are separate SRS work, not completed by these four interface/lifecycle tasks.
