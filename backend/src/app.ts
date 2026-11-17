@@ -1,3 +1,5 @@
+import { sessionAuth } from "./session-auth.js";
+import { sessionRuntime } from "./session-runtime.js";
 import express, { type Request } from "express";
 import cors from "cors";
 import { AccessToken, TrackSource } from "livekit-server-sdk";
@@ -83,6 +85,14 @@ export function createApp(options: {
     });
     res.json({ ...media, token: await token.toJwt(), serverUrl: config.livekitPublicUrl });
   });
+  if (!options.roomService && !options.authenticateUser) {
+    const auth = sessionAuth();
+    const runtime = sessionRuntime(defaultPrisma, roomService as PrismaRoomLifecycleService, config);
+    runtime.routes(app, auth.middleware);
+    app.locals.sessionRuntime = runtime;
+    app.locals.verifySession = auth.verify;
+    options.authenticateUser = auth.middleware;
+  }
   app.use(createRoomRouter({
     service: roomService,
     authenticate: options.authenticateUser,

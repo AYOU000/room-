@@ -9,6 +9,7 @@ if (!Number.isSafeInteger(port) || port < 1 || port > 65535) {
 const server = app.listen(port, () => {
   console.log(`Room API listening on port ${port}`);
 });
+app.locals.sessionRuntime?.attach(server, app.locals.verifySession);
 server.requestTimeout = 15_000;
 server.headersTimeout = 10_000;
 server.keepAliveTimeout = 5_000;

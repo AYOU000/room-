@@ -14,7 +14,7 @@ This document turns the SRS requirements for room admission, debate lifecycle, t
 3. PostgreSQL stores durable room/session state and timing metadata. Raw audio and transcript text remain ephemeral and are outside these contracts.
 4. All mutations are authenticated, membership-checked, validated at the server boundary, and safe to retry.
 5. The user-facing application has exactly two human participant slots. An authorized ASR service identity is not a human participant and does not consume a slot.
-6. One session is one timed audio discussion. No debate phases, video, screen sharing, or audience are implied.
+6. One session is one timed audio discussion with both human microphones available. Adding solo/open phases requires an explicit specification change. No video, screen sharing, or audience are implied.
 
 ## 2. Identifiers, actors, and durable state
 
@@ -215,11 +215,11 @@ Every server event has this envelope:
 
 ```json
 {
-  "eventId": "uuid",
-  "sessionId": "uuid",
+  "event_id": "uuid",
+  "session_id": "uuid",
   "type": "timer.sync",
   "sequence": 17,
-  "serverTime": "2026-11-07T09:00:05.000Z",
+  "server_time": "2026-11-07T09:00:05.000Z",
   "payload": {
     "state": "active",
     "startedAt": "2026-11-07T09:00:00.000Z",
@@ -228,7 +228,7 @@ Every server event has this envelope:
 }
 ```
 
-- `sequence` is monotonically increasing within a session. Repeated delivery with the same `eventId` or sequence is ignored.
+- `sequence` is monotonically increasing within a session. Repeated delivery with the same `event_id` or sequence is ignored.
 - A gap causes the client to fetch `GET /api/rooms/:roomId` and reconcile. On reconnect, always fetch the snapshot first. A transcript snapshot may be requested only while active and is served from the authorized server-memory buffer.
 - Relevant event types: `room.updated`, `participant.updated`, `session.state`, `timer.sync`, `media.participant`, `transcript.segment`, and `evaluation.status`. Transcript payload ownership and schema remain defined by the separate transcription contract.
 - Terminal `session.state` stops further transcript event delivery. The event stream contains no access token, refresh token, invite code, raw audio, or secrets.
