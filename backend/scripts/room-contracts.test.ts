@@ -31,3 +31,15 @@ describe('room wire contracts', () => {
    expect(() => sessionAuth({ AUTH_JWKS_URL: 'http://example.com/keys' })).toThrow();
  });
 });
+
+import { createRoomSchema } from '../src/security-validation.js';
+describe('room creation field boundaries', () => {
+ it('defaults to ten minutes and accepts inclusive limits', () => {
+  expect(createRoomSchema.parse({title:'12345'}).durationSeconds).toBe(600);
+  expect(createRoomSchema.safeParse({title:'x'.repeat(200),description:'x'.repeat(2000),durationSeconds:1800}).success).toBe(true);
+  expect(createRoomSchema.safeParse({title:'12345',durationSeconds:120}).success).toBe(true);
+ });
+ it.each([{title:'1234'}, {title:'x'.repeat(201)}, {title:'Valid topic',description:'x'.repeat(2001)}, {title:'Valid topic',durationSeconds:119}, {title:'Valid topic',durationSeconds:1801}])('rejects invalid field boundaries', value => {
+  expect(createRoomSchema.safeParse(value).success).toBe(false);
+ });
+});

@@ -9,7 +9,12 @@ function setup() {
  const session = { id: 'session', roomId: 'room', state: 'WAITING', endReason: null, startedAt: null, endsAt: null, endedAt: null, evaluationStatus: 'PENDING', durationSeconds: 600, participants } as any;
  const room = { id: 'room', creatorId: 'creator', title: 'Topic', description: null, durationSeconds: 600, status: 'WAITING', inviteExpiresAt: new Date(now.getTime()+86400000), session };
  const db: any = {
-  $queryRaw: async () => [],
+  $queryRaw: async () => [{ id: 'room' }],
+  sessionParticipant: {
+   create: async ({data}: any) => { session.participants.push({ ...data, isReady: false, consentAt: null, consentVersion: null, audioConnected: false }); },
+   delete: async ({where}: any) => { session.participants = session.participants.filter((p: any) => p.userId !== where.sessionId_userId.userId); },
+   updateMany: async ({data}: any) => { session.participants.forEach((p: any) => Object.assign(p, data)); return { count: session.participants.length }; },
+  },
   room: { findUnique: async () => room, update: async ({data}: any) => Object.assign(room, data) },
   debateSession: {
    findUnique: async () => session,
@@ -68,5 +73,42 @@ describe('room lifecycle policy', () => {
   await service.cancelRoom('room','creator',now);
   await service.startRoom('room','creator','privacy-v1',now);
   expect(session.state).toBe('CANCELLED');
+ });
+});
+
+describe('waiting-room admission and departure', () => {
+ it('releases the guest slot and admits a different account, clearing readiness', async () => {
+  const { service, session, now } = setup();
+  await service.leaveRoom('room', 'guest', now);
+  expect(session.participants).toHaveLength(1);
+  expect(session.participants[0].isReady).toBe(false);
+  await expect(service.readRoom('room','guest',now)).rejects.toMatchObject({code:'NOT_FOUND'});
+  const joined = await service.joinRoom('replacement','invite',now);
+  expect(joined.participants.map(p => p.participantId)).toEqual(['creator','replacement']);
+  expect(joined.participants[1].slot).toBe(2);
+ });
+ it('rejects full, expired and closed invitations and creator self-join', async () => {
+  const { service, room, now } = setup();
+  await expect(service.joinRoom('third','invite',now)).rejects.toMatchObject({code:'ROOM_FULL'});
+  await expect(service.joinRoom('creator','invite',now)).rejects.toMatchObject({code:'STATE_CONFLICT'});
+  expect((await service.joinRoom('guest','invite',now)).participants).toHaveLength(2);
+  room.inviteExpiresAt = now;
+  await expect(service.joinRoom('third','invite',now)).rejects.toMatchObject({code:'INVITE_INVALID'});
+ });
+ it('creator departure cancels and invalidates admission', async () => {
+  const { service, session, now } = setup();
+  await service.leaveRoom('room','creator',now);
+  expect(session.state).toBe('CANCELLED');
+  await expect(service.joinRoom('third','invite',now)).rejects.toMatchObject({code:'INVITE_INVALID'});
+ });
+ it('rejects active departures and noncreator edits, resets both acknowledgements on edit', async () => {
+  const { service, session, now } = setup();
+  await expect(service.updateRoom('room','guest',{title:'New topic'},now)).rejects.toMatchObject({code:'FORBIDDEN'});
+  await service.updateRoom('room','creator',{title:'New topic',durationSeconds:900},now);
+  expect(session.participants.every((p: any) => !p.isReady)).toBe(true);
+  expect(session.topicSnapshot).toBe('New topic');
+  session.state = 'ACTIVE';
+  await expect(service.leaveRoom('room','guest',now)).rejects.toMatchObject({code:'STATE_CONFLICT'});
+  await expect(service.updateRoom('room','creator',{title:'Another topic'},now)).rejects.toMatchObject({code:'STATE_CONFLICT'});
  });
 });
