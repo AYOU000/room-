@@ -1,3 +1,4 @@
+import { Link } from "react-router";
 import { Kicker } from "../components/Kicker";
 import { CreateRoomCard } from "../features/dashboard/CreateRoomCard";
 import { JoinRoomCard } from "../features/dashboard/JoinRoomCard";
@@ -29,6 +30,8 @@ export function DashboardPage() {
           SAMPLE DATA
         </span>
       </header>
+
+      <Link to="/lobby" className="rounded border p-4 font-bold">Open live room lobby →</Link>
 
       <StatsSummary stats={sampleStats} />
 
